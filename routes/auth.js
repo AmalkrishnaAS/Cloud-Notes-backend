@@ -8,12 +8,12 @@ const User=require('../models/User');
 const { response } = require('express');
 const bcrypt=require('bcryptjs')
 const jwt=require('jsonwebtoken')
-
+const fetchuser=require('../middleware/fetchuser')
 const JWT_SECRET='amalisagood$boy'
 
 
 
-//create a user using: POST "/api/auth/createuser".doesnt require login
+//ROUTE1:create a user using: POST "/api/auth/createuser".doesnt require login
 
 router.post('/createuser',[
     body('email','Enter a valid email').isEmail(),
@@ -65,6 +65,59 @@ console.log(authtoken)
 res.json({authtoken:authtoken})
   
 }catch(error){
+  console.error(error.message);
+  res.status(500).send("Something went wrong")
+}
+})
+//ROUTE2:Authenticate User using :POST "api/auth/login" no login required
+router.post('/login',[
+  body('email','Enter a valid email').isEmail(),
+  body('password','Password cannot be blank').exists()
+],async (req, res) => {
+  const errors=validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+    
+    
+  }
+  const {email,password}=req.body
+  try
+  {
+    let user=await User.findOne({email})
+    if(!user)
+    {
+      return res.status(400).json({error:"Please Login with correct credentials"})
+    }
+    const passwordCompare=await bcrypt.compare(password,user.password)
+    if(!passwordCompare)
+    {
+      return res.status(400).json({error:"Please Login with correct credentials"})
+    }
+    const data={
+      user:{
+        id:user.id
+      }
+    }
+    const authtoken=jwt.sign(data,JWT_SECRET)
+    console.log(authtoken)
+    res.json({authtoken:authtoken})
+
+  }catch(error){
+    console.error(error.message);
+    res.status(500).send("Something went wrong")
+  }
+
+})
+
+
+//ROUTE3:get logged in User details using :POST "api/auth/getuser"  login required
+
+router.post('/getuser',fetchuser,async (req, res) => {
+try {
+  let  userid=req.user.id
+  const user=await User.findById(userid).select("-password")
+  res.send(user)
+} catch (error) {
   console.error(error.message);
   res.status(500).send("Something went wrong")
 }
